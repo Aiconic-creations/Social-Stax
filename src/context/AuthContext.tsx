@@ -57,38 +57,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Fetch user profile
-        let profile: UserProfile | null = null;
-        try {
-          // We need to wait a bit if it's a new signup for the profile to be created
-          // But usually getUserProfile handles null gracefully or we can retry
-          // For now, simple fetch
-          // Note: getUserProfile uses getAuthenticatedUid which relies on getCurrentUser from authService
-          // But here we are inside onAuthStateChanged, so authService might not be updated yet?
-          // Actually dbService.getUserProfile calls getAuthenticatedUid() -> getCurrentUser()
-          // We should probably pass the uid directly if dbService allowed, but it doesn't.
-          // However, firebase auth state is global.
-          profile = await getUserProfile().catch(e => {
-            console.warn("Failed to fetch profile", e);
-            return null;
-          });
-        } catch (err) {
-            console.error(err);
-        }
-
+        // Set user immediately so isAuthenticated is true right away
+        // This prevents the login-loop race condition
         setCurrentUser({
           userId: user.uid,
           email: user.email,
-          profile
+          profile: null
         });
+        setLoading(false);
+
+        // Then fetch profile in the background and update
+        try {
+          const profile = await getUserProfile().catch(e => {
+            console.warn("Failed to fetch profile", e);
+            return null;
+          });
+          setCurrentUser(prev => prev.userId === user.uid ? { ...prev, profile } : prev);
+        } catch (err) {
+          console.error(err);
+        }
       } else {
         setCurrentUser({
           userId: null,
           email: null,
           profile: null
         });
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();

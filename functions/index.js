@@ -369,7 +369,7 @@ exports.geminiAI = functions.https.onCall(async (data, context) => {
 
   const { GoogleGenerativeAI } = require('@google/generative-ai');
   const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' });
 
   try {
     let result;
@@ -492,7 +492,7 @@ exports.geminiLiveChat = functions.https.onCall(async (data, context) => {
 
     const { GoogleGenerativeAI } = require('@google/generative-ai');
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' });
 
     // Build conversation with context
     const contents = [];
@@ -551,8 +551,8 @@ exports.geminiVoiceAssistant = functions.https.onCall(async (data, context) => {
     const { GoogleGenerativeAI } = require('@google/generative-ai');
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
-    // Use Gemini 2.0 Flash model with audio capabilities
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    // Use Gemini with audio capabilities for voice assistant
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' });
 
     // Prepare the audio part
     const audioPart = {
