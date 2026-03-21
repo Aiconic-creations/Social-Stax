@@ -198,7 +198,7 @@ const VoiceAssistant: React.FC = () => {
     // Call Gemini via cloud function
     try {
       const functions = getFirebaseFunctions();
-      const geminiChat = httpsCallable(functions, 'geminiLiveChat');
+      const geminiVoice = httpsCallable(functions, 'geminiVoiceAssistant');
 
       // Build conversation history for context
       const history = messages.slice(-6).map(m => ({
@@ -206,16 +206,23 @@ const VoiceAssistant: React.FC = () => {
         text: m.text.replace(/\[NAVIGATE:[^\]]+\]/g, '').trim()
       }));
 
-      const result = await geminiChat({
-        message: userText,
+      const result = await geminiVoice({
+        audioContent: userText,
         history,
         systemContext: SYSTEM_CONTEXT,
-      }) as { data: { text?: string } };
+      }) as { data: { text?: string, audio?: string, mimeType?: string } };
 
       const responseText: string = result.data?.text || "I'm sorry, I didn't catch that. Could you try again?";
       const assistantMsg: Message = { role: 'assistant', text: responseText, timestamp: new Date() };
       setMessages(prev => [...prev, assistantMsg]);
-      speak(responseText);
+      
+      if (result.data?.audio) {
+        const audio = new Audio(`data:${result.data.mimeType};base64,${result.data.audio}`);
+        audio.play();
+      } else {
+        speak(responseText);
+      }
+      
       parseAndHandleNavigation(responseText);
     } catch (error: Error) {
       console.error('Gemini chat error:', error);
