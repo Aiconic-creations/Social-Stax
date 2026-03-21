@@ -208,15 +208,38 @@ export const signUpWithEmail = async (
   }
 };
 
-// Sign in with Google — uses redirect (more reliable than popup across all browsers/domains)
-export const loginWithGoogle = async (): Promise<void> => {
+// Sign in with Google — uses popup with redirect fallback (HashRouter breaks redirect flow)
+export const loginWithGoogle = async (): Promise<User> => {
   const provider = new GoogleAuthProvider();
   provider.addScope('email');
   provider.addScope('profile');
-  await signInWithRedirect(auth, provider);
+
+  let userCredential;
+  try {
+    // Try popup first (works best with HashRouter)
+    userCredential = await signInWithPopup(auth, provider);
+  } catch (popupError: any) {
+    // If popup was blocked or failed, fall back to redirect
+    if (
+      popupError.code === 'auth/popup-blocked' ||
+      popupError.code === 'auth/popup-closed-by-user'
+    ) {
+      console.warn('Popup blocked/closed, falling back to redirect:', popupError.code);
+      await signInWithRedirect(auth, provider);
+      // signInWithRedirect navigates away; this line won't execute,
+      // but we need to satisfy TypeScript
+      throw new Error('Redirecting for Google sign-in...');
+    }
+    throw popupError;
+  }
+
+  const user = userCredential.user;
+  const admin = isAdminUser(user.email ?? '');
+  await createUserRecord(user.uid, user.email ?? '', admin, user.displayName ?? '', user.phoneNumber ?? '');
+  return mapFirebaseUserToAppUser(user);
 };
 
-// Call this on app load to handle the redirect result
+// Call this on app load to handle the redirect result (fallback path)
 export const handleGoogleRedirectResult = async (): Promise<void> => {
   try {
     const result = await getRedirectResult(auth);
