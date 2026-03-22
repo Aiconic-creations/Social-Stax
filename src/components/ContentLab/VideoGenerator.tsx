@@ -41,7 +41,19 @@ export default function VideoGenerator({ credits, onRefresh }: VideoGeneratorPro
       >
         {loading ? 'Generating...' : 'Generate Video'}
       </button>
-      {result && <div className="mt-4 text-white">{result}</div>}
+      {result && (
+        <div className="mt-4">
+          <p className="text-xs text-gray-400 mb-2">Cinematic key frame preview:</p>
+          <img
+            src={result}
+            alt="Video key frame"
+            className="w-full rounded-lg shadow-lg"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

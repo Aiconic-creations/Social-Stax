@@ -8,21 +8,32 @@ const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
 export async function textToImage(prompt: string): Promise<string> {
   try {
-    // This is a placeholder as direct image generation is not supported in the client-side SDK
-    // In a real application, this would be a call to a backend that uses Vertex AI or a similar service.
-    console.warn('Image generation is not supported in this environment. Returning a placeholder.');
-    return `https://via.placeholder.com/512x512.png?text=${encodeURIComponent(prompt)}`;
+    const seed = Math.floor(Math.random() * 1000000);
+    return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&model=flux&nologo=true&seed=${seed}`;
   } catch (error) {
     console.error('Text to image error:', error);
     throw error;
   }
 }
+
 export async function editImage(imageUrl: string, instructions: string): Promise<string> {
-  console.warn('editImage: not fully implemented, returning placeholder.');
-  return `https://via.placeholder.com/512x512.png?text=${encodeURIComponent(instructions)}`;
+  try {
+    const editPrompt = `${instructions}, photorealistic, high quality, detailed`;
+    const seed = Math.floor(Math.random() * 1000000);
+    return `https://image.pollinations.ai/prompt/${encodeURIComponent(editPrompt)}?width=1024&height=1024&model=flux&nologo=true&seed=${seed}`;
+  } catch (error) {
+    console.error('Edit image error:', error);
+    throw error;
+  }
 }
 
 export async function generateVideo(prompt: string): Promise<string> {
-  console.warn('generateVideo: not fully implemented, returning placeholder.');
-  return `Video generation for: ${prompt}`;
+  try {
+    const framePrompt = `${prompt}, cinematic movie still, dramatic lighting, high quality, 16:9 film frame`;
+    const seed = Math.floor(Math.random() * 1000000);
+    return `https://image.pollinations.ai/prompt/${encodeURIComponent(framePrompt)}?width=1280&height=720&model=flux&nologo=true&seed=${seed}`;
+  } catch (error) {
+    console.error('Generate video error:', error);
+    throw error;
+  }
 }

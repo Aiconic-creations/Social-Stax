@@ -34,12 +34,14 @@ const ContentLabView: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [generatedVideoFrameUrl, setGeneratedVideoFrameUrl] = useState<string | null>(null);
 
   const handleGenerate = async () => {
     if (!topic) return alert('Please enter a topic or prompt');
     setIsLoading(true);
     setResult('');
     setGeneratedImageUrl(null);
+    setGeneratedVideoFrameUrl(null);
     
     try {
       if (activeTab === 'text') {
@@ -53,9 +55,13 @@ const ContentLabView: React.FC = () => {
           : `**Enhanced Prompt:**\n${enhanced.enhancedPrompt}\n\n**Technical Parameters:**\n${enhanced.technicalParams}`;
         setResult(finalResult);
         
-        // For image tab, also generate an actual image using Pollinations
+        // For image tab, generate an actual image using Pollinations
         if (activeTab === 'image') {
           await generateActualImage(enhanced);
+        }
+        // For video tab, generate a cinematic key frame
+        if (activeTab === 'video') {
+          generateVideoFrame(enhanced);
         }
       }
     } catch (error) {
@@ -93,6 +99,18 @@ const ContentLabView: React.FC = () => {
       console.error('Image generation error:', error);
       setIsGeneratingImage(false);
     }
+  };
+
+  const generateVideoFrame = (enhancedPrompt: any) => {
+    const promptText = typeof enhancedPrompt === 'string'
+      ? enhancedPrompt
+      : enhancedPrompt.enhancedPrompt;
+    const seed = Math.floor(Math.random() * 1000000);
+    const framePrompt = `${promptText}, cinematic movie still, dramatic lighting, film grain, high quality, 16:9 aspect ratio`;
+    const frameUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(framePrompt)}?width=1280&height=720&model=flux&nologo=true&seed=${seed}`;
+    const img = new Image();
+    img.onload = () => setGeneratedVideoFrameUrl(frameUrl);
+    img.src = frameUrl;
   };
 
   const handleSaveDraft = async () => {
@@ -297,6 +315,17 @@ const ContentLabView: React.FC = () => {
                     {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
                   </Button>
                 </div>
+                {/* Video key frame preview */}
+                {activeTab === 'video' && generatedVideoFrameUrl && (
+                  <div className="mb-4">
+                    <p className="text-xs text-gray-500 mb-2">Key frame preview:</p>
+                    <img
+                      src={generatedVideoFrameUrl}
+                      alt="Video key frame"
+                      className="w-full rounded-xl shadow-lg"
+                    />
+                  </div>
+                )}
                 <div className="prose prose-invert max-w-none flex-1 overflow-auto custom-scrollbar">
                   <div className="whitespace-pre-wrap text-gray-300 text-sm leading-relaxed font-sans italic">
                     {result}

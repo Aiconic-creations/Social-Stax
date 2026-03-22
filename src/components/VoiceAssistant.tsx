@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mic, MicOff, Volume2, X, Minimize2, Maximize2, Bot, Loader2, Navigation } from 'lucide-react';
+import { Mic, MicOff, Volume2, X, Minimize2, Maximize2, Bot, Loader2, Navigation, Send } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { getFirebaseFunctions } from '@/config/firebase';
 
@@ -78,8 +78,11 @@ const VoiceAssistant: React.FC = () => {
   const [isSupported, setIsSupported] = useState(true);
   const [isTTSSupported, setIsTTSSupported] = useState(true);
 
+  const [textInput, setTextInput] = useState('');
+
   const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -89,6 +92,16 @@ const VoiceAssistant: React.FC = () => {
     }
     if (!window.speechSynthesis) {
       setIsTTSSupported(false);
+    } else {
+      // Load voices — Chrome fires voiceschanged async, Safari/Firefox sync
+      const loadVoices = () => {
+        voicesRef.current = window.speechSynthesis.getVoices();
+      };
+      loadVoices();
+      window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+      return () => {
+        window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
+      };
     }
   }, []);
 
@@ -108,8 +121,8 @@ const VoiceAssistant: React.FC = () => {
     utterance.rate = 1.05;
     utterance.pitch = 1;
     utterance.volume = 1;
-    // Prefer a high-quality voice
-    const voices = window.speechSynthesis.getVoices();
+    // Use pre-loaded voices (avoids Chrome async timing issue)
+    const voices = voicesRef.current.length ? voicesRef.current : window.speechSynthesis.getVoices();
     const preferred = voices.find(v =>
       v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Karen') || v.name.includes('Daniel')
     ) || voices.find(v => v.lang === 'en-US') || voices[0];
@@ -365,7 +378,39 @@ const VoiceAssistant: React.FC = () => {
         </div>
 
         {/* Controls */}
-        <div className="p-3 border-t border-white/5 bg-gray-900/50">
+        <div className="p-3 border-t border-white/5 bg-gray-900/50 space-y-2">
+          {/* Text input */}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={textInput}
+              onChange={(e) => setTextInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && textInput.trim() && !isProcessing) {
+                  processUserMessage(textInput.trim());
+                  setTextInput('');
+                }
+              }}
+              placeholder="Type a message..."
+              disabled={isProcessing}
+              className="flex-1 bg-gray-800 text-white text-xs px-3 py-2 rounded-lg border border-gray-700 outline-none focus:border-cyan-500 transition-colors disabled:opacity-50 placeholder-gray-600"
+            />
+            <button
+              onClick={() => {
+                if (textInput.trim() && !isProcessing) {
+                  processUserMessage(textInput.trim());
+                  setTextInput('');
+                }
+              }}
+              disabled={!textInput.trim() || isProcessing}
+              className="p-2 bg-gradient-to-br from-cyan-500 to-purple-600 rounded-lg text-white disabled:opacity-40 transition-opacity flex-shrink-0"
+              title="Send"
+            >
+              <Send size={14} />
+            </button>
+          </div>
+
+          {/* Mic controls */}
           <div className="flex items-center justify-center gap-3">
             {isSpeaking && (
               <button
@@ -379,15 +424,15 @@ const VoiceAssistant: React.FC = () => {
 
             <button
               onClick={toggleListening}
-              disabled={isProcessing}
+              disabled={isProcessing || !isSupported}
               className={`relative w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${
                 isListening
                   ? 'bg-red-600 hover:bg-red-700 shadow-red-900/40'
-                  : isProcessing
+                  : isProcessing || !isSupported
                   ? 'bg-gray-700 cursor-not-allowed'
                   : 'bg-gradient-to-br from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 shadow-purple-900/40'
               }`}
-              title={isListening ? 'Stop' : 'Speak to Stax'}
+              title={isListening ? 'Stop' : isSupported ? 'Speak to Stax' : 'Voice not supported — type instead'}
             >
               {isListening && (
                 <div className="absolute inset-0 rounded-full bg-red-600 animate-ping opacity-30" />
@@ -402,14 +447,14 @@ const VoiceAssistant: React.FC = () => {
             </button>
           </div>
 
-          <p className="text-center text-xs text-gray-600 mt-2">
+          <p className="text-center text-xs text-gray-600">
             {!isSupported
-              ? 'Voice not supported in this browser'
+              ? 'Voice unavailable — type above to chat'
               : isListening
               ? 'Listening... tap to stop'
               : isProcessing
-              ? 'Processing your request...'
-              : 'Tap mic to speak · Can navigate the app'}
+              ? 'Processing...'
+              : 'Tap mic or type · Can navigate the app'}
           </p>
         </div>
       </div>

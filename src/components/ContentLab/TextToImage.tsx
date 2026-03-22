@@ -41,7 +41,18 @@ export default function TextToImage({ credits, onRefresh }: TextToImageProps) {
       >
         {loading ? 'Generating...' : 'Generate Image'}
       </button>
-      {result && <div className="mt-4 text-white">{result}</div>}
+      {result && (
+        <div className="mt-4">
+          <img
+            src={result}
+            alt="Generated"
+            className="w-full rounded-lg shadow-lg"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
