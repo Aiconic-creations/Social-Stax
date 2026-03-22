@@ -6,7 +6,10 @@ const jwt = require('jsonwebtoken');
 admin.initializeApp();
 const db = admin.firestore();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is not set. Authentication will fail.');
+}
 
 
 // Database Schema Collections:
@@ -369,14 +372,14 @@ exports.geminiAI = functions.https.onCall(async (data, context) => {
 
   const { GoogleGenerativeAI } = require('@google/generative-ai');
   const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro' });
 
   try {
     let result;
 
     if (operation === 'generateImage') {
       const { prompt } = payload;
-      const imageModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const imageModel = genAI.getGenerativeModel({ model: 'gemini-3.1-flash' });
       const result = await imageModel.generateContent({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
@@ -506,7 +509,7 @@ exports.geminiLiveChat = functions.https.onCall(async (data, context) => {
 
     const { GoogleGenerativeAI } = require('@google/generative-ai');
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro-latest' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro' });
 
     // Build conversation with context
     const contents = [];
@@ -566,7 +569,7 @@ exports.geminiVoiceAssistant = functions.https.onCall(async (data, context) => {
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
     // Use Gemini with audio capabilities for voice assistant
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro-latest' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro' });
 
     // Prepare the audio part
     const audioPart = {
