@@ -6,8 +6,11 @@ const jwt = require('jsonwebtoken');
 admin.initializeApp();
 const db = admin.firestore();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || '';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is not set. Authentication will fail.');
+}
+
 
 // Database Schema Collections:
 // - users: { email, passwordHash, createdAt, role }
@@ -16,7 +19,7 @@ const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || '';
 // - accessTokens: { token, createdBy, expiresAt, quotaLimit, quotaUsed }
 
 // Sign Up - Regular User
-exports.signUp = functions.https.onCall(async (data, context) => {
+exports.signUp = functions.https.onCall(async (data) => {
   try {
     const { email, password } = data;
 
@@ -71,7 +74,7 @@ exports.signUp = functions.https.onCall(async (data, context) => {
 });
 
 // Login - Regular User
-exports.login = functions.https.onCall(async (data, context) => {
+exports.login = functions.https.onCall(async (data) => {
   try {
     const { email, password } = data;
 
@@ -141,7 +144,7 @@ exports.login = functions.https.onCall(async (data, context) => {
 });
 
 // Admin Login
-exports.adminLogin = functions.https.onCall(async (data, context) => {
+exports.adminLogin = functions.https.onCall(async (data) => {
   try {
     const { email, password } = data;
 
@@ -187,7 +190,7 @@ exports.adminLogin = functions.https.onCall(async (data, context) => {
 });
 
 // Verify Token
-exports.verifyToken = functions.https.onCall(async (data, context) => {
+exports.verifyToken = functions.https.onCall(async (data) => {
   try {
     const { token } = data;
 
@@ -288,7 +291,7 @@ exports.updateSubscription = functions.https.onCall(async (data, context) => {
 });
 
 // Track API Usage
-exports.trackApiUsage = functions.https.onCall(async (data, context) => {
+exports.trackApiUsage = functions.https.onCall(async (data) => {
   try {
     const { userId, tokenOrEmail } = data;
 
@@ -326,7 +329,7 @@ exports.trackApiUsage = functions.https.onCall(async (data, context) => {
 });
 
 // Get User Quota Status
-exports.getQuotaStatus = functions.https.onCall(async (data, context) => {
+exports.getQuotaStatus = functions.https.onCall(async (data) => {
   try {
     const { userId } = data;
 
@@ -369,10 +372,32 @@ exports.geminiAI = functions.https.onCall(async (data, context) => {
 
   const { GoogleGenerativeAI } = require('@google/generative-ai');
   const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro' });
 
   try {
     let result;
+
+    if (operation === 'generateImage') {
+      const { prompt } = payload;
+      const imageModel = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-image-preview' });
+      const result = await imageModel.generateContent({
+        contents: [{ role: 'user', parts: [{ text: `Generate an image: ${prompt}` }] }],
+        generationConfig: {
+          responseMimeType: 'image/png',
+        },
+      });
+      const response = result.response;
+      const candidates = response.candidates;
+      if (!candidates || !candidates[0]?.content?.parts) {
+        throw new functions.https.HttpsError('internal', 'No image generated');
+      }
+      // Find the image part in the response
+      const imagePart = candidates[0].content.parts.find(p => p.inlineData);
+      if (!imagePart) {
+        throw new functions.https.HttpsError('internal', 'No image data in response');
+      }
+      return { imageData: `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}` };
+    }
 
     if (operation === 'generateContent') {
       const { topic, platform } = payload;
@@ -392,10 +417,57 @@ exports.geminiAI = functions.https.onCall(async (data, context) => {
 
     if (operation === 'analyzeWebsite') {
       const { url } = payload;
-      const systemPrompt = `Analyze the website URL provided and infer brand details like name, industry, tone, description, and primary color. URL: ${url} Output JSON: { "name": "...", "industry": "...", "tone": "...", "description": "...", "color": "#..." }`;
+
+      // Fetch the actual website content so Gemini can analyze real data
+      let siteContent = '';
+      try {
+        const https = require('https');
+        const http = require('http');
+        const client = url.startsWith('https') ? https : http;
+
+        siteContent = await new Promise((resolve, reject) => {
+          const req = client.get(url, { timeout: 8000, headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
+            // Follow one redirect
+            if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) {
+              const redirectUrl = res.headers.location;
+              const redirectClient = redirectUrl.startsWith('https') ? https : http;
+              redirectClient.get(redirectUrl, { timeout: 8000, headers: { 'User-Agent': 'Mozilla/5.0' } }, (res2) => {
+                let data = '';
+                res2.on('data', chunk => { if (data.length < 50000) data += chunk; });
+                res2.on('end', () => resolve(data));
+                res2.on('error', reject);
+              }).on('error', reject);
+            } else {
+              let data = '';
+              res.on('data', chunk => { if (data.length < 50000) data += chunk; });
+              res.on('end', () => resolve(data));
+              res.on('error', reject);
+            }
+          });
+          req.on('error', reject);
+          req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+        });
+
+        // Strip scripts/styles/tags, keep readable text
+        siteContent = siteContent
+          .replace(/<script[\s\S]*?<\/script>/gi, '')
+          .replace(/<style[\s\S]*?<\/style>/gi, '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 6000);
+      } catch (fetchErr) {
+        console.warn('Could not fetch website, falling back to URL inference:', fetchErr.message);
+      }
+
+      const context = siteContent
+        ? `Website URL: ${url}\n\nWebsite content:\n${siteContent}`
+        : `Website URL: ${url}`;
+
+      const systemPrompt = `You are a brand analyst. Analyze the following website information and extract brand details.\n\n${context}\n\nOutput ONLY valid JSON (no markdown, no explanation): { "name": "Brand Name", "industry": "Industry", "tone": "Professional|Friendly|Luxury|Bold|Playful|Educational|Minimalist", "description": "Short 1-2 sentence brand description", "color": "#hexcode" }`;
       result = await model.generateContent([systemPrompt]);
-      const text = result.response.text();
-      const jsonMatch = text.match(/\{.*\}/s);
+      const text = result.response.text().trim();
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
       return jsonMatch ? JSON.parse(jsonMatch[0]) : null;
     }
 
@@ -445,7 +517,7 @@ exports.geminiLiveChat = functions.https.onCall(async (data, context) => {
 
     const { GoogleGenerativeAI } = require('@google/generative-ai');
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro' });
 
     // Build conversation with context
     const contents = [];
@@ -504,8 +576,8 @@ exports.geminiVoiceAssistant = functions.https.onCall(async (data, context) => {
     const { GoogleGenerativeAI } = require('@google/generative-ai');
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
-    // Use Gemini 2.0 Flash model with audio capabilities
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    // Use Gemini with audio capabilities for voice assistant
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro' });
 
     // Prepare the audio part
     const audioPart = {
@@ -559,6 +631,49 @@ exports.geminiVoiceAssistant = functions.https.onCall(async (data, context) => {
   }
 });
 
+// Manual Usage Reset - Admin only
+exports.manualusagereset = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const adminDoc = await db.collection('users').doc(context.auth.uid).get();
+  if (!adminDoc.exists || adminDoc.data().role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+  }
+
+  try {
+    const usersSnapshot = await db.collection('users').get();
+    const batches = [];
+    let batch = db.batch();
+    let opCount = 0;
+
+    for (const userDoc of usersSnapshot.docs) {
+      batch.update(userDoc.ref, {
+        'usage.contentGenerations': 0,
+        'usage.imageGenerations': 0,
+        'usage.voiceAssistantMinutes': 0,
+        'usage.apiCalls': 0,
+        'usage.lastReset': admin.firestore.FieldValue.serverTimestamp(),
+      });
+      opCount++;
+      if (opCount === 499) {
+        batches.push(batch.commit());
+        batch = db.batch();
+        opCount = 0;
+      }
+    }
+    if (opCount > 0) batches.push(batch.commit());
+    await Promise.all(batches);
+
+    return { status: 'success', message: `Reset usage for ${usersSnapshot.size} users` };
+  } catch (error) {
+    console.error('manualusagereset error:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+
 // One-time Admin Bootstrap - DELETE after first admin is created
 exports.bootstrapAdmin = functions.https.onRequest(async (req, res) => {
   const secret = req.headers['x-setup-secret'] || req.query.secret;
@@ -574,7 +689,7 @@ exports.bootstrapAdmin = functions.https.onRequest(async (req, res) => {
   try {
     let userRecord;
     try { userRecord = await admin.auth().getUserByEmail(email); }
-    catch (e) { userRecord = await admin.auth().createUser({ email, password, displayName, emailVerified: true }); }
+    catch { userRecord = await admin.auth().createUser({ email, password, displayName, emailVerified: true }); }
     await admin.auth().setCustomUserClaims(userRecord.uid, { admin: true, role: 'admin' });
     const trialExp = new Date(); trialExp.setFullYear(trialExp.getFullYear() + 10);
     await db.collection('users').doc(userRecord.uid).set({
@@ -598,3 +713,4 @@ exports.bootstrapAdmin = functions.https.onRequest(async (req, res) => {
 });
 
 module.exports = exports;
+

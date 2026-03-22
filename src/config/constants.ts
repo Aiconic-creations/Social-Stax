@@ -3,7 +3,7 @@ import { DropdownOption } from '~/types';
 export const APP_ID = 'socialstack-ai-manager';
 
 // Official website URL - for Firebase Hosting
-export const OFFICIAL_WEBSITE_URL = import.meta.env.VITE_FIREBASE_URL || 'https://YOUR-PROJECT-ID.web.app';
+export const OFFICIAL_WEBSITE_URL = import.meta.env.VITE_FIREBASE_URL || 'https://social-stax-7ce24.web.app';
 
 // Google Gemini API Key - for AI features
 export const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || '';
@@ -34,8 +34,8 @@ const validateFirebaseConfig = () => {
   // Log detailed error information
   if (isMissing) {
     const missingVars = Object.entries(isInvalid)
-      .filter(([_, v]) => v)
-      .map(([k, _]) => k)
+      .filter(([, v]) => v)
+      .map(([k]) => k)
       .join(', ');
     
     console.error(

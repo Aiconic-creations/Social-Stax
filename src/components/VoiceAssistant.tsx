@@ -10,10 +10,45 @@ interface Message {
   timestamp: Date;
 }
 
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionResult {
+  [index: number]: SpeechRecognitionAlternative;
+  isFinal: boolean;
+  length: number;
+}
+
+interface SpeechRecognitionResultList {
+  [index: number]: SpeechRecognitionResult;
+  length: number;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onerror: (event: SpeechRecognitionErrorEvent) => void;
+  onend: () => void;
+  start: () => void;
+  stop: () => void;
+}
+
 declare global {
   interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
+    SpeechRecognition: { new (): SpeechRecognition };
+    webkitSpeechRecognition: { new (): SpeechRecognition };
   }
 }
 
@@ -78,7 +113,7 @@ const VoiceAssistant: React.FC = () => {
   const [isSupported, setIsSupported] = useState(true);
   const [isTTSSupported, setIsTTSSupported] = useState(true);
 
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -164,7 +199,7 @@ const VoiceAssistant: React.FC = () => {
       }
     }
 
-    // Call Gemini via cloud function
+    // Call Gemini Live Chat via cloud function (text-based conversational AI)
     try {
       const functions = getFirebaseFunctions();
       const geminiChat = httpsCallable(functions, 'geminiLiveChat');
@@ -179,14 +214,15 @@ const VoiceAssistant: React.FC = () => {
         message: userText,
         history,
         systemContext: SYSTEM_CONTEXT,
-      }) as any;
+      }) as { data: { success?: boolean, text?: string } };
 
       const responseText: string = result.data?.text || "I'm sorry, I didn't catch that. Could you try again?";
       const assistantMsg: Message = { role: 'assistant', text: responseText, timestamp: new Date() };
       setMessages(prev => [...prev, assistantMsg]);
+
       speak(responseText);
       parseAndHandleNavigation(responseText);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Gemini chat error:', error);
       const errMsg = 'Sorry, I had trouble connecting. Please try again.';
       setMessages(prev => [...prev, { role: 'assistant', text: errMsg, timestamp: new Date() }]);
@@ -207,7 +243,7 @@ const VoiceAssistant: React.FC = () => {
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       const lastResult = event.results[event.results.length - 1];
       const text = lastResult[0].transcript;
       setTranscript(text);
@@ -217,7 +253,7 @@ const VoiceAssistant: React.FC = () => {
       }
     };
 
-    recognition.onerror = (event: any) => {
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error('Speech error:', event.error);
       setIsListening(false);
       setTranscript('');

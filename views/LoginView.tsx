@@ -20,8 +20,8 @@ const LoginView: React.FC = () => {
 
   const validateEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
-  const getGoogleAuthErrorMessage = (err: any): string => {
-    const code = err?.code || err?.message || '';
+  const getGoogleAuthErrorMessage = (err: Error): string => {
+    const code = (err as { code?: string; message?: string })?.code || err?.message || '';
     if (code.includes('operation-not-allowed')) {
       return 'Google Sign-In is not enabled. Please enable it in Firebase Console under Authentication → Sign-in providers.';
     }
@@ -49,8 +49,9 @@ const LoginView: React.FC = () => {
     try {
       await login(email, password);
       navigate('/');
-    } catch (err: any) {
-      const code = err?.code || err?.message || '';
+    } catch (err: unknown) {
+      const error = err as { code?: string; message?: string };
+      const code = error?.code || (error as Error)?.message || '';
       if (code.includes('user-not-found') || code.includes('invalid-credential') || code.includes('invalid-login-credentials')) {
         setError('No account found with this email. Please sign up first.');
       } else if (code.includes('wrong-password')) {
@@ -58,7 +59,8 @@ const LoginView: React.FC = () => {
       } else if (code.includes('too-many-requests')) {
         setError('Too many failed attempts. Please try again later.');
       } else {
-        setError(err.message || 'Sign in failed. Please try again.');
+        const message = error instanceof Error ? error.message : 'Sign in failed. Please try again.';
+        setError(message);
       }
     } finally {
       setLoading(false);
@@ -76,13 +78,15 @@ const LoginView: React.FC = () => {
     try {
       await signUp(email, password, name.trim(), phone.trim());
       navigate('/');
-    } catch (err: any) {
-      const code = err?.code || err?.message || '';
+    } catch (err: unknown) {
+      const error = err as { code?: string; message?: string };
+      const code = error?.code || (error as Error)?.message || '';
       if (code.includes('email-already-in-use')) {
         setError('An account with this email already exists. Please sign in instead.');
         setMode('signin');
       } else {
-        setError(err.message || 'Sign up failed. Please try again.');
+        const message = error instanceof Error ? error.message : 'Sign up failed. Please try again.';
+        setError(message);
       }
     } finally {
       setLoading(false);
@@ -95,8 +99,9 @@ const LoginView: React.FC = () => {
     try {
       await loginWithGoogle();
       navigate('/');
-    } catch (err: any) {
-      setError(getGoogleAuthErrorMessage(err));
+    } catch (err: unknown) {
+      const error = err as { message?: string; code?: string };
+      setError(getGoogleAuthErrorMessage(error as Error));
     } finally {
       setLoading(false);
     }
@@ -108,7 +113,7 @@ const LoginView: React.FC = () => {
     try {
       await loginGuest();
       navigate('/');
-    } catch (err: any) {
+    } catch {
       setError('Failed to continue as guest.');
       setLoading(false);
     }
@@ -131,7 +136,7 @@ const LoginView: React.FC = () => {
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-wide bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">Social StaX</h1>
-            <p className="text-xs text-gray-500 hidden sm:block">A-Iconic's all-in-one Marketing Platform</p>
+            <p className="text-xs text-gray-500 hidden sm:block">A-Iconic&apos;s all-in-one Marketing Platform</p>
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -141,8 +146,8 @@ const LoginView: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="relative z-10 flex flex-col items-center justify-center px-4 mt-6 md:mt-12 pb-12">
-        <div className="w-full max-w-md">
+      <main className="relative z-10 flex flex-col items-center justify-center px-4 pb-12" style={{ minHeight: 'calc(100vh - 80px)' }}>
+        <div className="w-full max-w-sm">
           {/* Mode Toggle */}
           <div className="flex mb-6 bg-gray-900/80 rounded-2xl p-1 border border-white/5 backdrop-blur-sm">
             <button

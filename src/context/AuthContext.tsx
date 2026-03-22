@@ -4,7 +4,8 @@ import {
   loginUser,
   logoutUser,
   loginGuest as loginGuestService,
-  loginWithGoogle as loginWithGoogleService
+  loginWithGoogle as loginWithGoogleService,
+  handleGoogleRedirectResult
 } from '~/services/authService';
 import { 
   onAuthStateChanged 
@@ -51,40 +52,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoading(false);
       return;
     }
+    // Handle Google redirect result on app load
+    handleGoogleRedirectResult();
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Fetch user profile
-        let profile: UserProfile | null = null;
-        try {
-          // We need to wait a bit if it's a new signup for the profile to be created
-          // But usually getUserProfile handles null gracefully or we can retry
-          // For now, simple fetch
-          // Note: getUserProfile uses getAuthenticatedUid which relies on getCurrentUser from authService
-          // But here we are inside onAuthStateChanged, so authService might not be updated yet?
-          // Actually dbService.getUserProfile calls getAuthenticatedUid() -> getCurrentUser()
-          // We should probably pass the uid directly if dbService allowed, but it doesn't.
-          // However, firebase auth state is global.
-          profile = await getUserProfile().catch(e => {
-            console.warn("Failed to fetch profile", e);
-            return null;
-          });
-        } catch (err) {
-            console.error(err);
-        }
-
+        // Set user immediately so isAuthenticated is true right away
+        // This prevents the login-loop race condition
         setCurrentUser({
           userId: user.uid,
           email: user.email,
-          profile
+          profile: null
         });
+        setLoading(false);
+
+        // Then fetch profile in the background and update
+        try {
+          const profile = await getUserProfile().catch(e => {
+            console.warn("Failed to fetch profile", e);
+            return null;
+          });
+          setCurrentUser(prev => prev.userId === user.uid ? { ...prev, profile } : prev);
+        } catch (err) {
+          console.error(err);
+        }
       } else {
         setCurrentUser({
           userId: null,
           email: null,
           profile: null
         });
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -94,7 +93,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       await signUpWithEmail(email, password, displayName, phone);
       // onAuthStateChanged will handle the state update
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMsg = error instanceof Error ? error.message : 'Sign up failed';
       console.error('Sign Up Error:', error);
       // Re-throw original error so caller can inspect error code
       throw error;
@@ -105,7 +105,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       await loginUser(email, password);
       // onAuthStateChanged will handle the state update
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMsg = error instanceof Error ? error.message : 'Login failed';
       console.error('Login Error:', error);
       throw error; // Re-throw original so caller can inspect error.code
     }
@@ -114,26 +115,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const loginWithGoogle = async () => {
     try {
       await loginWithGoogleService();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMsg = error instanceof Error ? error.message : 'Google login failed';
       console.error('Google Login Error:', error);
-      throw new Error(error.message || 'Failed to login with Google');
+      throw new Error(errorMsg || 'Failed to login with Google');
     }
   };
 
   const loginGuest = async () => {
     try {
       await loginGuestService();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMsg = error instanceof Error ? error.message : 'Guest login failed';
       console.error('Guest Login Error:', error);
-      throw new Error(error.message || 'Failed to login as guest');
+      throw new Error(errorMsg || 'Failed to login as guest');
     }
   };
 
   const logout = async () => {
     try {
       await logoutUser();
-    } catch (error: any) {
-      throw new Error(error.message);
+    } catch (error: unknown) {
+      const errorMsg = error instanceof Error ? error.message : 'Logout failed';
+      throw new Error(errorMsg);
     }
   };
 

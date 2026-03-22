@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom';
+import React from 'react';
+import { Routes, Route, useParams, useLocation } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import LoginView from '~/views/LoginView';
 import DashboardView from '~/views/DashboardView';
@@ -28,19 +28,17 @@ const ClientDetailWrapper: React.FC<{ onPostScheduled: () => void }> = ({ onPost
 };
 
 const ErrorFallback: React.FC = () => {
-  const navigate = useNavigate();
   return (
     <div className="p-6 md:p-10 flex-grow max-w-7xl mx-auto text-center text-gray-400">
       <h1 className="text-3xl font-bold mb-4 text-white">404 - Page Not Found</h1>
       <p className="mb-6">The requested page could not be found.</p>
-      <Button variant="primary" onClick={() => navigate('/')}>Go to Dashboard</Button>
+      <Button variant="primary" onClick={() => window.history.back()}>Go Back</Button>
     </div>
   );
 };
 
 const WebRouter: React.FC = () => {
   const location = useLocation();
-  const navigate = useNavigate();
   const { isAuthenticated, loading: isAuthLoading } = useAuth();
   const {
     clients,
@@ -53,12 +51,6 @@ const WebRouter: React.FC = () => {
     handlePostScheduled,
     handleDeletePost
   } = useClientData(isAuthenticated);
-
-  useEffect(() => {
-    if (!isAuthLoading && !isAuthenticated) {
-      navigate('/login');
-    }
-  }, [isAuthenticated, isAuthLoading, navigate]);
 
   if (isAuthLoading) {
     return (
@@ -85,13 +77,11 @@ const WebRouter: React.FC = () => {
     onDataRefresh: handleRefresh,
   };
 
-  console.log('[WebRouter] Rendering main layout. Path:', location.pathname);
-  
   return (
     <div className="flex min-h-screen bg-black flex-col md:flex-row">
       <VoiceAssistant />
       <Navbar clients={clients} />
-      <div className="flex-1 flex flex-col overflow-auto relative">
+      <div className="flex-1 flex flex-col overflow-auto relative pt-14 md:pt-0">
         {loadError && (
           <div className="bg-red-900 text-red-100 p-4 m-4 rounded z-50 relative">
             <p className="font-semibold">Error loading data:</p>

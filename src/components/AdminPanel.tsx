@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
 import { createFreeAccessGrant, revokeFreeAccessGrant, getFreeAccessGrants, getUserByEmail } from '~/services/dbService';
+import { useAuth } from '@/context/AuthContext';
 import Button from './Button';
 import { Lock } from 'lucide-react';
+import type { FreeAccessGrant } from '~/types';
+
+const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET_KEY || '';
 
 const AdminPanel: React.FC = () => {
+  const { isAdmin } = useAuth();
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   
@@ -21,15 +26,15 @@ const AdminPanel: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [grants, setGrants] = useState<any[]>([]);
+  const [grants, setGrants] = useState<FreeAccessGrant[]>([]);
   const [isLoadingGrants, setIsLoadingGrants] = useState(false);
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminPassword === 'admin123') {
+    if (isAdmin || (ADMIN_SECRET && adminPassword === ADMIN_SECRET)) {
         setIsAdminAuthenticated(true);
     } else {
-        alert('Incorrect Password');
+        setMessage({ type: 'error', text: 'Incorrect admin password.' });
     }
   };
 
@@ -78,7 +83,7 @@ const AdminPanel: React.FC = () => {
         reason: grantReason, 
         expiresAt: expirationDate,
         ...(showCustomLimits && { customLimits }),
-      } as any); 
+      }); 
 
       setMessage({
         type: 'success',
@@ -319,8 +324,8 @@ const AdminPanel: React.FC = () => {
               {grants.map((grant) => (
                 <div key={grant.id} className="bg-gray-800 p-4 rounded border border-gray-700 flex justify-between items-start">
                   <div className="flex-1">
-                    <p className="text-white font-medium">{grant.email}</p>
-                    <p className="text-gray-400 text-sm">Plan: {grant.plan} • Reason: {grant.reason}</p>
+                    <p className="text-white font-medium">{grant.userEmail}</p>
+                    <p className="text-gray-400 text-sm">Plan: {grant.plan} {grant.reason ? `• Reason: ${grant.reason}` : ''}</p>
                     {grant.expiresAt && (
                       <p className="text-yellow-400 text-sm">
                         Expires: {new Date(grant.expiresAt).toLocaleDateString()}
@@ -328,7 +333,7 @@ const AdminPanel: React.FC = () => {
                     )}
                   </div>
                   <button
-                    onClick={() => handleRevokeAccess(grant.id, grant.email)}
+                    onClick={() => handleRevokeAccess(grant.id || '', grant.userEmail)}
                     className="ml-4 px-4 py-2 bg-red-900 hover:bg-red-800 text-red-300 rounded text-sm"
                   >
                     Revoke

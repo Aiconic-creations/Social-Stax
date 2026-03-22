@@ -1,137 +1,220 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { 
- LayoutDashboard, 
- UserPlus, 
- FileText, 
- FlaskConical, 
- Download, 
- HelpCircle, 
- CreditCard,
- Users,
- ChevronRight,
- LogOut,
- Shield,
- Settings
+import {
+  LayoutDashboard,
+  UserPlus,
+  FileText,
+  FlaskConical,
+  Download,
+  HelpCircle,
+  CreditCard,
+  Users,
+  ChevronRight,
+  LogOut,
+  Shield,
+  Settings,
+  Zap,
+  Menu,
+  X
 } from 'lucide-react';
-import { signOut } from 'firebase/auth';
 import { Client } from '~/types';
 
 interface NavbarProps {
- clients: Client[];
+  clients: Client[];
 }
 
 const Navbar: React.FC<NavbarProps> = ({ clients }) => {
- const location = useLocation();
- const navigate = useNavigate();
- const { isAdmin, logout } = useAuth();
- const path = location.pathname;
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { isAdmin, logout } = useAuth();
+  const path = location.pathname;
+  const [mobileOpen, setMobileOpen] = useState(false);
 
- const handleLogout = async () => {
- try {
- await logout();
- navigate('/login');
- } catch (error) {
- console.error('Logout failed:', error);
- }
- };
+  // Auto-close mobile menu on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
 
- const navItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'All Clients', path: '/clients', icon: Users },
-    { name: 'Add Client', path: '/add-client', icon: UserPlus },
-    { name: 'Content Lab', path: '/content-lab', icon: FlaskConical },
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
+  const navItems = [
+    { name: 'Dashboard',    path: '/',             icon: LayoutDashboard },
+    { name: 'All Clients',  path: '/clients',      icon: Users },
+    { name: 'Add Client',   path: '/add-client',   icon: UserPlus },
+    { name: 'Content Lab',  path: '/content-lab',  icon: FlaskConical },
     { name: 'Prompt Guide', path: '/prompt-guide', icon: HelpCircle },
-    { name: 'Templates', path: '/templates', icon: FileText },
-    { name: 'Downloads', path: '/downloads', icon: Download },
-    { name: 'Billing', path: '/billing', icon: CreditCard },
-    { name: 'Settings', path: '/settings', icon: Settings },
+    { name: 'Templates',    path: '/templates',    icon: FileText },
+    { name: 'Downloads',    path: '/downloads',    icon: Download },
+    { name: 'Billing',      path: '/billing',      icon: CreditCard },
+    { name: 'Settings',     path: '/settings',     icon: Settings },
   ];
 
- if (isAdmin) {
-   navItems.push({ name: 'Admin Panel', path: '/admin', icon: Shield });
- }
+  if (isAdmin) {
+    navItems.push({ name: 'Admin Panel', path: '/admin', icon: Shield });
+  }
 
- const isActive = (itemPath: string) => path === itemPath;
+  const isActive = (itemPath: string) => path === itemPath;
 
- return (
- <nav className="w-full md:w-64 bg-gray-950 text-white flex flex-col h-auto md:h-screen border-r border-gray-800 z-50">
- <div className="p-6">
- <div className="flex items-center gap-3 mb-8">
- <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center font-bold text-xl shadow-lg shadow-red-900/20">S</div>
- <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
- Social Stax
- </h1>
- </div>
- </div>
+  const navContent = (
+    <>
+      {/* Subtle grid overlay */}
+      <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        style={{ backgroundImage: 'linear-gradient(rgba(99,179,237,1) 1px,transparent 1px),linear-gradient(90deg,rgba(99,179,237,1) 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
 
- <div className="flex-1 overflow-y-auto px-4 space-y-8 pb-8">
- <div>
- <h2 className="text-[10px] uppercase tracking-widest text-gray-500 font-bold px-4 mb-4">Main Menu</h2>
- <div className="space-y-1">
- {navItems.map((item) => (
- <Link
- key={item.path}
- to={item.path}
- className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
- isActive(item.path) 
- ? 'bg-red-600/10 text-red-500 border border-red-600/20 shadow-[0_0_20px_rgba(220,38,38,0.05)]' 
- : 'text-gray-400 hover:bg-gray-900 hover:text-white border border-transparent'
- }`}
- >
- <item.icon size={18} className={isActive(item.path) ? 'text-red-500' : 'group-hover:text-white'} />
- <span className="font-medium text-sm">{item.name}</span>
- </Link>
- ))}
- </div>
- </div>
+      {/* Logo */}
+      <div className="relative px-5 pt-6 pb-5 border-b flex items-center justify-between" style={{ borderColor: 'rgba(30,58,120,0.35)' }}>
+        <div className="flex items-center gap-3">
+          <div className="relative w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, #e11d48 0%, #7c3aed 100%)', boxShadow: '0 0 18px rgba(124,58,237,0.5)' }}>
+            <Zap size={18} className="text-white" />
+            <div className="absolute inset-0 rounded-xl" style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15)' }} />
+          </div>
+          <div>
+            <h1 className="text-[15px] font-bold tracking-wide text-white leading-none">Social StaX</h1>
+            <p className="text-[10px] mt-0.5" style={{ color: '#3b82f6' }}>AI Marketing Platform</p>
+          </div>
+        </div>
+        {/* Mobile close button */}
+        <button onClick={() => setMobileOpen(false)} className="md:hidden p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+          <X size={20} />
+        </button>
+      </div>
 
- <div>
- <div className="flex items-center justify-between px-4 mb-4">
- <h2 className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Recent Clients</h2>
- <Users size={12} className="text-gray-600" />
- </div>
- <div className="space-y-1">
- {clients && clients.length > 0 ? (
- clients.slice(0, 5).map((client) => (
- <Link
- key={client.id}
- to={`/client/${client.id}`}
- className="flex items-center justify-between px-4 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-900 hover:text-white transition-colors group"
- >
- <span className="truncate max-w-[140px]">{client.name}</span>
- <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-600" />
- </Link>
- ))
- ) : (
- <p className="px-4 py-2 text-xs text-gray-600 italic">No clients yet</p>
- )}
- </div>
- </div>
- </div>
+      {/* Nav */}
+      <div className="relative flex-1 overflow-y-auto px-3 py-4 space-y-6">
+        <div>
+          <p className="text-[9px] font-bold uppercase tracking-[0.2em] px-3 mb-2" style={{ color: 'rgba(99,179,237,0.4)' }}>Main Menu</p>
+          <div className="space-y-0.5">
+            {navItems.map((item) => {
+              const active = isActive(item.path);
+              return (
+                <Link key={item.path} to={item.path}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative overflow-hidden"
+                  style={active ? {
+                    background: 'linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(124,58,237,0.08) 100%)',
+                    borderLeft: '2px solid #3b82f6',
+                    paddingLeft: '10px',
+                  } : {
+                    borderLeft: '2px solid transparent',
+                    paddingLeft: '10px',
+                  }}
+                >
+                  {active && (
+                    <div className="absolute inset-0 rounded-xl pointer-events-none"
+                      style={{ boxShadow: 'inset 0 0 20px rgba(59,130,246,0.05)' }} />
+                  )}
+                  <item.icon size={16} style={{ color: active ? '#60a5fa' : 'rgba(148,163,184,0.7)', flexShrink: 0 }}
+                    className="transition-all duration-200 group-hover:!text-blue-400" />
+                  <span className="text-[13px] font-medium transition-all duration-200"
+                    style={{ color: active ? '#e2e8f0' : 'rgba(148,163,184,0.7)' }}
+                    onMouseEnter={e => !active && ((e.target as HTMLElement).style.color = '#e2e8f0')}
+                    onMouseLeave={e => !active && ((e.target as HTMLElement).style.color = 'rgba(148,163,184,0.7)')}
+                  >{item.name}</span>
+                  {active && <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#3b82f6', boxShadow: '0 0 6px #3b82f6' }} />}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
 
- <div className="p-4 border-t border-gray-900 space-y-4 mt-auto">
- <div className="bg-gradient-to-br from-gray-900 to-black p-4 rounded-2xl border border-gray-800">
- <p className="text-xs text-gray-400 mb-2">Pro Plan Active</p>
- <div className="w-full bg-gray-800 h-1 rounded-full overflow-hidden mb-3">
- <div className="bg-red-600 h-full w-[65%]" />
- </div>
- <button className="text-[10px] font-bold text-white uppercase tracking-wider hover:text-red-500 transition-colors">
- Upgrade Capacity
- </button>
- </div>
+        {/* Recent Clients */}
+        <div>
+          <div className="flex items-center justify-between px-3 mb-2">
+            <p className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(99,179,237,0.4)' }}>Recent Clients</p>
+            <Users size={10} style={{ color: 'rgba(99,179,237,0.3)' }} />
+          </div>
+          <div className="space-y-0.5">
+            {clients && clients.length > 0 ? (
+              clients.slice(0, 5).map((client) => (
+                <Link key={client.id} to={`/client/${client.id}`}
+                  className="flex items-center justify-between px-3 py-2 rounded-lg transition-all group"
+                  style={{ color: 'rgba(148,163,184,0.6)' }}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'rgba(99,179,237,0.4)' }} />
+                    <span className="text-[12px] truncate max-w-[120px] group-hover:text-white transition-colors">{client.name}</span>
+                  </div>
+                  <ChevronRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" style={{ color: '#3b82f6' }} />
+                </Link>
+              ))
+            ) : (
+              <p className="px-3 py-2 text-[11px] italic" style={{ color: 'rgba(99,179,237,0.3)' }}>No clients yet</p>
+            )}
+          </div>
+        </div>
+      </div>
 
- <button
- onClick={handleLogout}
- className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-red-600/10 text-red-500 border border-red-600/20 hover:bg-red-600/20 transition-colors group font-medium text-sm"
- >
- <LogOut size={18} />
- Logout
- </button>
- </div>
- </nav>
- );
+      {/* Footer */}
+      <div className="relative p-3 space-y-2 border-t" style={{ borderColor: 'rgba(30,58,120,0.35)' }}>
+        {/* Usage bar */}
+        <div className="px-3 py-3 rounded-xl" style={{ background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(30,58,120,0.4)' }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-medium" style={{ color: 'rgba(148,163,184,0.6)' }}>Pro Plan</span>
+            <span className="text-[10px]" style={{ color: '#3b82f6' }}>65%</span>
+          </div>
+          <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(30,58,120,0.4)' }}>
+            <div className="h-full w-[65%] rounded-full" style={{ background: 'linear-gradient(90deg, #3b82f6, #7c3aed)', boxShadow: '0 0 8px rgba(59,130,246,0.6)' }} />
+          </div>
+          <Link to="/billing">
+            <button className="mt-2 text-[10px] font-bold uppercase tracking-wider transition-colors hover:text-blue-400" style={{ color: 'rgba(148,163,184,0.5)' }}>
+              Upgrade Plan →
+            </button>
+          </Link>
+        </div>
+
+        <button onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group"
+          style={{ background: 'rgba(225,29,72,0.08)', border: '1px solid rgba(225,29,72,0.2)', color: '#f87171' }}
+        >
+          <LogOut size={15} />
+          <span className="text-[13px] font-medium">Logout</span>
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile hamburger button - fixed top bar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3"
+        style={{ background: 'linear-gradient(180deg, #050c1a 0%, #080d1f 100%)', borderBottom: '1px solid rgba(30,58,120,0.4)' }}>
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 flex items-center justify-center rounded-lg"
+            style={{ background: 'linear-gradient(135deg, #e11d48 0%, #7c3aed 100%)' }}>
+            <Zap size={14} className="text-white" />
+          </div>
+          <span className="text-sm font-bold text-white">Social StaX</span>
+        </div>
+        <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+          <Menu size={22} />
+        </button>
+      </div>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+      )}
+
+      {/* Sidebar - hidden on mobile, slide-in drawer when open */}
+      <nav className={`
+        fixed md:relative inset-y-0 left-0 z-50 w-64 flex flex-col
+        transform transition-transform duration-300 ease-in-out
+        ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0
+        md:h-screen
+      `}
+        style={{ background: 'linear-gradient(180deg, #050c1a 0%, #080d1f 100%)', borderRight: '1px solid rgba(30,58,120,0.4)' }}>
+        {navContent}
+      </nav>
+    </>
+  );
 };
 
 export default Navbar;
