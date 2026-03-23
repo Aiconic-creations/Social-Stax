@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mic, MicOff, Volume2, X, Minimize2, Maximize2, Bot, Loader2, Navigation, Send } from 'lucide-react';
-import { httpsCallable } from 'firebase/functions';
-import { getFirebaseFunctions } from '@/config/firebase';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { useAuth } from '@/context/AuthContext';
+
+const GEMINI_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY as string | undefined;
+const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
 
 interface Message {
   role: 'user' | 'assistant';
@@ -62,6 +65,7 @@ Always be helpful, concise, and friendly. You can help with:
 - Feature explanations`;
 
 const VoiceAssistant: React.FC = () => {
+  const { isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -177,24 +181,43 @@ const VoiceAssistant: React.FC = () => {
       }
     }
 
-    // Call Gemini via cloud function
+    // Auth guard — require login
+    if (!isAuthenticated) {
+      const errMsg = 'Please log in to chat with Stax.';
+      setMessages(prev => [...prev, { role: 'assistant', text: errMsg, timestamp: new Date() }]);
+      speak(errMsg);
+      setIsProcessing(false);
+      return;
+    }
+
+    // API key guard
+    if (!genAI) {
+      const errMsg = 'AI assistant is not configured. Please contact support.';
+      setMessages(prev => [...prev, { role: 'assistant', text: errMsg, timestamp: new Date() }]);
+      speak(errMsg);
+      setIsProcessing(false);
+      return;
+    }
+
+    // Call Gemini directly from the client
     try {
-      const functions = getFirebaseFunctions();
-      const geminiChat = httpsCallable(functions, 'geminiLiveChat');
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
       // Build conversation history for context
       const history = messages.slice(-6).map(m => ({
-        role: m.role,
-        text: m.text.replace(/\[NAVIGATE:[^\]]+\]/g, '').trim()
+        role: m.role === 'user' ? 'user' : 'model' as 'user' | 'model',
+        parts: [{ text: m.text.replace(/\[NAVIGATE:[^\]]+\]/g, '').trim() }],
       }));
 
-      const result = await geminiChat({
-        message: userText,
-        history,
-        systemContext: SYSTEM_CONTEXT,
-      }) as any;
+      const result = await model.generateContent({
+        systemInstruction: { parts: [{ text: SYSTEM_CONTEXT }] },
+        contents: [
+          ...history,
+          { role: 'user', parts: [{ text: userText }] },
+        ],
+      });
 
-      const responseText: string = result.data?.text || "I'm sorry, I didn't catch that. Could you try again?";
+      const responseText: string = result.response.text() || "I'm sorry, I didn't catch that. Could you try again?";
       const assistantMsg: Message = { role: 'assistant', text: responseText, timestamp: new Date() };
       setMessages(prev => [...prev, assistantMsg]);
       speak(responseText);
