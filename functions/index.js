@@ -458,11 +458,11 @@ exports.geminiAI = functions.https.onCall(async (data, context) => {
         console.warn('Could not fetch website, falling back to URL inference:', fetchErr.message);
       }
 
-      const context = siteContent
+      const siteContext = siteContent
         ? `Website URL: ${url}\n\nWebsite content:\n${siteContent}`
         : `Website URL: ${url}`;
 
-      const systemPrompt = `You are a brand analyst. Analyze the following website information and extract brand details.\n\n${context}\n\nOutput ONLY valid JSON (no markdown, no explanation): { "name": "Brand Name", "industry": "Industry", "tone": "Professional|Friendly|Luxury|Bold|Playful|Educational|Minimalist", "description": "Short 1-2 sentence brand description", "color": "#hexcode" }`;
+      const systemPrompt = `You are a brand analyst. Analyze the following website information and extract brand details.\n\n${siteContext}\n\nOutput ONLY valid JSON (no markdown, no explanation): { "name": "Brand Name", "industry": "Industry", "tone": "Professional|Friendly|Luxury|Bold|Playful|Educational|Minimalist", "description": "Short 1-2 sentence brand description", "color": "#hexcode" }`;
       result = await ai.models.generateContent({
         model: 'gemini-3.1-pro',
         contents: [{ role: 'user', parts: [{ text: systemPrompt }] }]
